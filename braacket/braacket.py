@@ -7,10 +7,10 @@ class Braacket:
     
     def __init__(self, league):
         # https://braacket.com/league/{league}
-        # https://braacket.com/league/{league}/player?rows=999999999
+        # https://braacket.com/league/{league}/player?rows=200
         # ie: 'NCMelee'
         self.league = league
-        self.update_player_cache()
+        #self.update_player_cache()
         return
 
     def update_player_cache(self):
@@ -28,8 +28,8 @@ class Braacket:
         # }
         r = requests.get(
             'https://braacket.com/league/'
-            f'{self.league}/player?rows=999999999', verify=False)
-            # dear braacket, please never disable this upperbound
+            f'{self.league}/player?rows=200', verify=False)
+            # the upperbound is 200
         soup = BeautifulSoup(r.text, 'html.parser')
         # <table class='table table-hover'> -v
         # <tbody> -> <tr> -> <td> -> <a> {player}
@@ -45,6 +45,75 @@ class Braacket:
             # match // extract, potential for a mtg fuse spell
             uuid = url_extract.match(player['href']).group(1)
             self.player_cache[player.string] = uuid
+    
+    def get_ranking(self):
+        # returns player ranking with basic data available at the ranking page
+
+        # ranking data is laid out as such:
+        # {
+        #   'uuid': {
+        #       'name': "player tag (string)",
+        #       'rank': "player rank (int)",
+        #       'score': "player score (int)",
+        #       'mains': [
+        #           {
+        #               'icon': "braacket character icon url (string)",
+        #               'name': "character name (string)"
+        #           },
+        #           ...
+        #       ]
+        #   },
+        #   ...
+        # }
+        r = requests.get(
+            'https://braacket.com/league/'
+            f'{self.league}/ranking?rows=200&embed=1', verify=False) # the upperbound is 200
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        table = soup.findAll('table')[1] # first table is ranking system, second has the player list
+        tbody = table.find('tbody') # skip the table's header
+        lines = tbody.select("tr") # get each of the table's lines
+        url_extract = re.compile(r'.*\/([^\/][^?]*)') # /league/{league}/player/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX
+
+        pranking = {}
+
+        for line in lines:
+            children = line.findChildren(recursive=False)
+
+            # [ [rank][0]- [icon][1] - [player name, mains][2] - [social media][3] - [?][4] - [score][5] ]
+
+            # uuid
+            uuid = url_extract.match(children[2].find('a')['href']).group(1)
+            pranking[uuid] = {}
+
+            # rank
+            rank = children[0].string.strip()
+            pranking[uuid]["rank"] = rank
+
+            # name
+            pranking[uuid]["name"] = children[2].find('a').string
+
+            # mains
+            pranking[uuid]["mains"] = []
+            mains = children[2].findAll('img')
+
+            for main in mains:
+                character = {}
+                character["name"] = main["title"]
+                character["icon"] = main["src"]
+                pranking[uuid]["mains"].append(character)
+
+            # twitter
+            links = children[3].select('a')
+
+            for link in links:
+                if "twitter.com" in link['href']:
+                    pranking[uuid]["twitter"] = link['href']
+            
+            # score
+            score = children[5].string.strip()
+            pranking[uuid]["score"] = score
+        return pranking
 
     def player_search(self, tag):
         tag = tag.strip()
