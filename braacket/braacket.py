@@ -115,6 +115,17 @@ class Braacket:
             pranking[uuid]["score"] = score
         return pranking
 
+    def get_league_name(self):
+        # returns the league's name
+        r = requests.get(
+            'https://braacket.com/league/'f'{self.league}', verify=False)
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        titleContainer = soup.findAll('div', {"class": "content_header-body"})[0]
+        title = titleContainer.find('h1')
+
+        return title.find('a').string
+
     def player_search(self, tag):
         tag = tag.strip()
         probability_list = []
