@@ -107,8 +107,9 @@ class Braacket:
             links = children[3].select('a')
 
             for link in links:
-                if "twitter.com" in link['href']:
-                    pranking[uuid]["twitter"] = link['href']
+                if link.has_attr('href'):
+                    if "twitter.com" in link['href']:
+                        pranking[uuid]["twitter"] = link['href']
             
             # score
             score = children[5].string.strip()
